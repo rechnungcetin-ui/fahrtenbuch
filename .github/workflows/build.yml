@@ -64,7 +64,7 @@ jobs:
           for key in CFBundleIdentifier CFBundleDisplayName CFBundleShortVersionString MinimumOSVersion \
                      UIBackgroundModes NSLocationAlwaysAndWhenInUseUsageDescription NSMotionUsageDescription \
                      NSCalendarsFullAccessUsageDescription NSCameraUsageDescription CFBundleIcons; do
-            printf '%s: ' "$key"; plutil -extract "$key" json -o - "$APP/Info.plist" 2>/dev/null | head -c 160 || echo "FEHLT"; echo
+            printf '%s: ' "$key"; (plutil -extract "$key" raw -o - "$APP/Info.plist" 2>/dev/null || plutil -extract "$key" json -o - "$APP/Info.plist" 2>/dev/null || echo FEHLT) | head -c 160; echo
           done
           ls -la "$APP" | head -n 30
           du -sh "$APP"
