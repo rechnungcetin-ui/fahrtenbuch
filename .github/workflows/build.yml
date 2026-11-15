@@ -56,6 +56,19 @@ jobs:
             }
           grep -E "warning:" build.log | sort -u | head -n 40 || true
 
+      - name: App prüfen
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Fahrtenbuch.app
+          echo "Swift-Warnungen: $(grep -cE '\.swift:[0-9]+:[0-9]+: warning' build.log || true)"
+          grep -E '\.swift:[0-9]+:[0-9]+: warning' build.log | sed 's|.*/Fahrtenbuch/||' | sort -u | head -n 30 || true
+          for key in CFBundleIdentifier CFBundleDisplayName CFBundleShortVersionString MinimumOSVersion \
+                     UIBackgroundModes NSLocationAlwaysAndWhenInUseUsageDescription NSMotionUsageDescription \
+                     NSCalendarsFullAccessUsageDescription NSCameraUsageDescription CFBundleIcons; do
+            printf '%s: ' "$key"; plutil -extract "$key" json -o - "$APP/Info.plist" 2>/dev/null | head -c 160 || echo "FEHLT"; echo
+          done
+          ls -la "$APP" | head -n 30
+          du -sh "$APP"
+
       - name: .ipa erstellen
         run: |
           mkdir -p Payload
