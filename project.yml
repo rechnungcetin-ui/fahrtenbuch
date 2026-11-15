@@ -32,6 +32,8 @@ targets:
       path: Fahrtenbuch/Info.plist
       properties:
         CFBundleDisplayName: Fahrtenbuch
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: de
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
