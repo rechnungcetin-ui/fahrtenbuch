@@ -1,0 +1,86 @@
+# Baut die App auf einem Mac von GitHub und stellt sie als Download bereit.
+#
+# Ergebnis:
+#   • Fahrtenbuch.ipa   – unsignierte App, Installation mit Sideloadly/AltStore und deiner Apple-ID (siehe README)
+#   • build.log         – vollständiges Build-Protokoll
+# Auf dem Haupt-Branch wird die .ipa zusätzlich unter „Releases → latest“ veröffentlicht.
+name: Build
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Neueste Xcode-Version wählen
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: XcodeGen installieren
+        run: brew install xcodegen
+
+      - name: Projekt erzeugen (ohne iCloud – mit kostenloser Apple-ID nicht erlaubt)
+        run: |
+          python3 - <<'PY'
+          lines = open("project.yml").read().split("\n")
+          out, skip = [], False
+          for line in lines:
+              if line.startswith("    entitlements:"):
+                  skip = True
+                  continue
+              if skip and line.startswith("    ") and not line.startswith("      "):
+                  skip = False
+              if not skip:
+                  out.append(line)
+          open("project.yml", "w").write("\n".join(out))
+          PY
+          xcodegen generate
+
+      - name: App bauen
+        run: |
+          xcodebuild -project Fahrtenbuch.xcodeproj -scheme Fahrtenbuch -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > build.log 2>&1 || {
+              echo "::group::Fehler"; grep -E "error:" build.log | sort -u | head -n 80; echo "::endgroup::"
+              tail -n 40 build.log
+              exit 1
+            }
+          grep -E "warning:" build.log | sort -u | head -n 40 || true
+
+      - name: .ipa erstellen
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/Fahrtenbuch.app Payload/
+          zip -qry Fahrtenbuch.ipa Payload
+
+      - name: Build-Protokoll hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: App hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fahrtenbuch-ipa
+          path: Fahrtenbuch.ipa
+
+      - name: Als Release „latest“ veröffentlichen
+        if: github.ref_name == github.event.repository.default_branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest Fahrtenbuch.ipa --prerelease \
+            --title "Fahrtenbuch – neuester Build" \
+            --notes "Automatisch gebaut aus ${GITHUB_SHA::7}. Installation: siehe README, Abschnitt „Aufs iPhone“."

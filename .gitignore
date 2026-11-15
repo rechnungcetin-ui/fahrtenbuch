@@ -1,0 +1,7 @@
+*.xcodeproj
+Fahrtenbuch/Info.plist
+Fahrtenbuch/Fahrtenbuch.entitlements
+.DS_Store
+build/
+DerivedData/
+*.zip
